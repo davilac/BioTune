@@ -1,4 +1,4 @@
-# BioTuner: Evolutionary Optimization for Neural Network Fine-Tuning
+# BioTune: Evolutionary Optimization for Neural Network Fine-Tuning
 
 BioTuner employs evolutionary algorithms to optimize neural network fine-tuning strategies by evolving layer-specific learning rates and selective training patterns. It combines bio-inspired optimization with adaptive learning techniques to find optimal fine-tuning configurations.
 
