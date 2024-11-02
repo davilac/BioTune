@@ -8,9 +8,6 @@ BioTuner employs evolutionary algorithms to optimize neural network fine-tuning 
 │ ├── data/
 │ │ ├── base_dataloader.py
 │ │ └── flower102_dataloader.py
-│ ├── models/
-│ │ ├── lora.py
-│ │ └── model_utils.py
 │ ├── optimization/
 │ │ ├── biotuner.py
 │ │ └── biotuner_problem.py
