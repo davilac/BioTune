@@ -70,11 +70,11 @@ def get_experiment_config() -> Dict:
             "resnet50",
         ],
         "learning_rates": [0.001],
-        "train_split_percentages": [0.1],
-        "population_sizes": [(3, 1)],  # (population_size, elite_size)
-        "n_generations": 4,
-        # "seeds": [684, 559, 629],
-        "seeds": [684, 559],
+        "train_split_percentages": [0.5],
+        "population_sizes": [(10, 3)],  # (population_size, elite_size)
+        "n_generations": 10,
+        "seeds": [684, 559, 629],
+        # "seeds": [684, 559],
     }
 
 
