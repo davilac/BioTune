@@ -14,7 +14,7 @@ BioTuner employs evolutionary algorithms to optimize neural network fine-tuning 
 │ └── training/
 │ │ ├── trainer.py
 │ │ └── utils.py
-│ ├── example/
+├── example/
 │ └── train_model.py
 └── README.md
 ```
