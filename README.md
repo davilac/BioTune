@@ -4,7 +4,6 @@ BioTuner employs evolutionary algorithms to optimize neural network fine-tuning 
 
 ## Project Structure
 ```
-adaptive-fine-tuning/
 ├── src/
 │ ├── data/
 │ │ ├── base_dataloader.py
