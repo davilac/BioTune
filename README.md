@@ -9,7 +9,7 @@ BioTune is an evolutionary algorithm that automatically finds optimal fine-tunin
 **Paper:**
 > Davila, A., Colan, J., & Hasegawa, Y. (2025). Bio-inspired fine-tuning for selective transfer learning in image classification. *IEEE Access*, vol. 13, pp. 129234-129249. doi: [10.1109/ACCESS.2025.3587524](https://doi.org/10.1109/ACCESS.2025.3587524)
 
-![Transfer Learning Overview](figures/fig1.pdf)
+<img src="figures/fig1.png" alt="Transfer Learning Overview" width="450">
 
 ---
 
@@ -39,7 +39,7 @@ Traditional fine-tuning approaches:
 2. Assign optimal learning rates per layer
 3. Find configurations that generalize better
 
-![BioTune Algorithm](figures/fig2.pdf)
+<img src="figures/fig2.png" alt="BioTune Algorithm" width="800">
 
 **Supported:**
 - Networks: ResNet50, DenseNet121
@@ -279,7 +279,7 @@ Given a pre-trained model, find the best:
 
 ### Solution: Evolutionary Algorithm
 
-![ResNet50 Architecture](figures/fig3.pdf)
+<img src="figures/fig3.png" alt="ResNet50 Architecture" width="350">
 
 **1. Gene Encoding**
 
