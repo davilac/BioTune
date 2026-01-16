@@ -31,7 +31,15 @@ class Flowers102DataModule:
         resize_size: int = 232,
         crop_size: int = 224,
     ):
-        """Initialize data module."""
+        """Initialize data module.
+        
+        Args:
+            train_split_pct: Percentage of data per fold (not random %, but stratified fold size)
+                - 1.0 = 1 fold with 100% of data
+                - 0.5 = 2 folds with 50% each (fold 0: 0-50%, fold 1: 50-100%)
+                - 0.25 = 4 folds with 25% each
+            seeds: Random seeds for training runs (not used for fold creation)
+        """
         self.data_dir = Path(data_dir)
         self.train_split_pct = train_split_pct
         self.seeds = seeds or [42]
@@ -41,6 +49,9 @@ class Flowers102DataModule:
         self.force_preprocess = force_preprocess
         self.resize_size = resize_size
         self.crop_size = crop_size
+        
+        # Calculate number of folds
+        self.n_folds = int(np.ceil(1.0 / train_split_pct))
 
         # Create transforms
         self.transform = self._create_transforms()
@@ -80,7 +91,10 @@ class Flowers102DataModule:
     def create_data_loaders(
         self,
     ) -> Tuple[List[DataLoader], List[DataLoader], DataLoader]:
-        """Create data loaders for all splits.
+        """Create data loaders for all folds.
+        
+        Creates n_folds stratified folds where all folds together = 100% of data.
+        Example: train_split_pct=0.5 → 2 folds (0-50%, 50-100%)
 
         Returns:
             Tuple of (train_loaders, val_loaders, test_loader)
@@ -88,9 +102,9 @@ class Flowers102DataModule:
         train_loaders = []
         val_loaders = []
 
-        # Create multiple train/val splits based on seeds
-        for seed in self.seeds:
-            train_dataset, val_dataset = self._create_train_val_datasets(seed)
+        # Create stratified folds (NOT random splits)
+        for fold_idx in range(self.n_folds):
+            train_dataset, val_dataset = self._create_train_val_datasets_fold(fold_idx)
 
             train_loader = DataLoader(
                 train_dataset,
@@ -110,6 +124,8 @@ class Flowers102DataModule:
 
             train_loaders.append(train_loader)
             val_loaders.append(val_loader)
+            
+            logger.info(f"Fold {fold_idx + 1}/{self.n_folds}: Train={len(train_dataset)}, Val={len(val_dataset)}")
 
         # Create test loader
         test_dataset = self._create_test_dataset()
@@ -123,50 +139,89 @@ class Flowers102DataModule:
 
         return train_loaders, val_loaders, test_loader
 
-    def _create_train_val_datasets(self, seed: int) -> Tuple[BaseDataset, BaseDataset]:
-        """Create training and validation datasets.
-
+    def _create_train_val_datasets_fold(self, fold_idx: int) -> Tuple[BaseDataset, BaseDataset]:
+        """Create training and validation datasets for a specific fold.
+        
+        Uses stratified sampling: each fold gets consecutive samples per class.
+        Example with train_split_pct=0.5 (2 folds):
+          - Fold 0: samples 0-50% from each class
+          - Fold 1: samples 50-100% from each class
+        
         Args:
-            seed: Random seed for split
+            fold_idx: Fold index (0 to n_folds-1)
 
         Returns:
             Tuple of (train_dataset, val_dataset)
         """
-        # Load the original training data
-        dataset = torchvision.datasets.Flowers102(
+        # Load the original training and validation data
+        train_dataset = torchvision.datasets.Flowers102(
             root=self.data_dir, split="train", download=False
+        )
+        val_dataset = torchvision.datasets.Flowers102(
+            root=self.data_dir, split="val", download=False
         )
 
         # Get image paths and labels
-        image_paths = np.array(dataset._image_files)
-        labels = torch.tensor(dataset._labels)
+        train_images = np.array(train_dataset._image_files)
+        train_labels = np.array(train_dataset._labels)
+        val_images = np.array(val_dataset._image_files)
+        val_labels = np.array(val_dataset._labels)
+        
+        # Get number of classes
+        n_classes = 102  # Flowers102 has 102 classes
+        
+        # Extract indices per class (stratified)
+        train_class_indices = [
+            np.where(train_labels == i)[0] for i in range(n_classes)
+        ]
+        val_class_indices = [
+            np.where(val_labels == i)[0] for i in range(n_classes)
+        ]
+        
+        # Calculate samples per class for this fold
+        size_train_per_class = int(self.train_split_pct * len(train_class_indices[0]))
+        size_val_per_class = int(self.train_split_pct * len(val_class_indices[0]))
+        
+        # Get indices for this fold (stratified sampling)
+        if fold_idx == self.n_folds - 1:
+            # Last fold gets remaining samples
+            train_fold_indices = np.array([
+                indices[fold_idx * size_train_per_class:]
+                for indices in train_class_indices
+            ]).flatten()
+            val_fold_indices = np.array([
+                indices[fold_idx * size_val_per_class:]
+                for indices in val_class_indices
+            ]).flatten()
+        else:
+            # Other folds get fixed-size chunks
+            train_fold_indices = np.array([
+                indices[fold_idx * size_train_per_class : (fold_idx + 1) * size_train_per_class]
+                for indices in train_class_indices
+            ]).flatten()
+            val_fold_indices = np.array([
+                indices[fold_idx * size_val_per_class : (fold_idx + 1) * size_val_per_class]
+                for indices in val_class_indices
+            ]).flatten()
 
-        # Create train/val split
-        np.random.seed(seed)
-        indices = np.random.permutation(len(image_paths))
-        split = int(self.train_split_pct * len(indices))
-
-        train_indices = indices[:split]
-        val_indices = indices[split:]
-
-        # Create datasets
-        train_dataset = BaseDataset(
-            image_paths[train_indices],
-            labels[train_indices],
+        # Create datasets for this fold
+        train_fold_dataset = BaseDataset(
+            train_images[train_fold_indices],
+            torch.tensor(train_labels[train_fold_indices]),
             self.transform,
             resize_size=self.resize_size,
             force_preprocess=self.force_preprocess,
         )
 
-        val_dataset = BaseDataset(
-            image_paths[val_indices],
-            labels[val_indices],
+        val_fold_dataset = BaseDataset(
+            val_images[val_fold_indices],
+            torch.tensor(val_labels[val_fold_indices]),
             self.transform,
             resize_size=self.resize_size,
             force_preprocess=self.force_preprocess,
         )
 
-        return train_dataset, val_dataset
+        return train_fold_dataset, val_fold_dataset
 
     def _create_test_dataset(self) -> BaseDataset:
         """Create test dataset.
@@ -196,11 +251,23 @@ def create_dataloaders(
     resize_size: int = 232,
     crop_size: int = 224,
 ) -> Tuple[List[DataLoader], List[DataLoader], DataLoader]:
-    """Create data loaders for Flowers102.
+    """Create data loaders for Flowers102 with stratified folds.
+    
+    Creates n_folds = ceil(1/train_split_pct) stratified folds where:
+    - All folds together cover 100% of data (no overlap)
+    - Each fold is stratified (same class distribution)
+    
+    Examples:
+        train_split_pct=1.0 → 1 fold with 100% of data
+        train_split_pct=0.5 → 2 folds (fold 0: 0-50%, fold 1: 50-100%)
+        train_split_pct=0.25 → 4 folds (each 25%)
+    
+    Generations cycle through folds:
+        - 5 generations + 2 folds → [fold0, fold1, fold0, fold1, fold0]
 
     Args:
-        train_split_pct: Percentage of training data to use
-        seeds: List of random seeds
+        train_split_pct: Percentage of data per fold (default: 1.0)
+        seeds: Random seeds for training runs (NOT used for fold creation)
         data_dir: Directory containing the dataset
         download: Whether to download the dataset if not found
         force_preprocess: Whether to force image preprocessing

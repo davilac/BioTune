@@ -7,8 +7,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import _LRScheduler
 
-from src.models.lora import (LoRADenseNet121, LoRAInceptionV3, LoRAResNet50,
-                           LoRAVGG19)
+# LoRA imports removed - not needed for core BioTune algorithm
+# from src.models.lora import (LoRADenseNet121, LoRAInceptionV3, LoRAResNet50,
+#                            LoRAVGG19)
 
 
 class RGNScheduler(_LRScheduler):

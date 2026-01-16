@@ -69,120 +69,57 @@ class FineTuneProblem:
         self, genes: np.ndarray, set_selector: List[int], method: str
     ) -> Dict[str, float]:
         """Compute learning rate ratios based on genes and method.
+        
+        Only supports adaptive_block_normexp (exponential normalization) for BioTune core.
 
         Args:
             genes: Gene values
-            set_selector: Binary list indicating selected sets
+            set_selector: Binary list indicating selected sets (one per block)
             method: Fine-tuning method
 
         Returns:
-            Dictionary of learning rate ratios
+            Dictionary of learning rate ratios (one per layer name)
         """
-        network_configs = {
-            "resnet50": {
-                "layers": [
-                    "conv1",
-                    "bn1",
-                    "layer1",
-                    "layer2",
-                    "layer3",
-                    "layer4",
-                    "fc",
-                ],
-            },
-            "densenet121": {
-                "layers": [
-                    "features.conv0",
-                    "features.norm0",
-                    "features.denseblock1",
-                    "features.transition1",
-                    "features.denseblock2",
-                    "features.transition2",
-                    "features.denseblock3",
-                    "features.transition3",
-                    "features.denseblock4",
-                    "features.norm5",
-                    "classifier",
-                ],
-            },
-            "vgg19": {
-                "layers": [
-                    "features.0",
-                    "features.2",
-                    "features.5",
-                    "features.7",
-                    "features.10",
-                    "features.12",
-                    "features.14",
-                    "features.16",
-                    "features.19",
-                    "features.21",
-                    "features.23",
-                    "features.25",
-                    "features.28",
-                    "features.30",
-                    "features.32",
-                    "features.34",
-                    "classifier",
-                ],
-            },
-            "inception_v3": {
-                "layers": [
-                    "Conv2d_1a_3x3",
-                    "Conv2d_2a_3x3",
-                    "Conv2d_2b_3x3",
-                    "Conv2d_3b_1x1",
-                    "Conv2d_4a_3x3",
-                    "Mixed_5b",
-                    "Mixed_5c",
-                    "Mixed_5d",
-                    "Mixed_6a",
-                    "Mixed_6b",
-                    "Mixed_6c",
-                    "Mixed_6d",
-                    "Mixed_6e",
-                    "AuxLogits",
-                    "Mixed_7a",
-                    "Mixed_7b",
-                    "Mixed_7c",
-                    "fc",
-                ],
-            },
-        }
+        # BioTune core method: exponential normalization
+        if method not in ["adaptive_block_normexp", "adaptive_block_exponential"]:
+            raise ValueError(
+                f"Method {method} not supported. "
+                "BioTune core only supports 'adaptive_block_normexp'"
+            )
 
-        if self.params["network"] not in network_configs:
-            raise ValueError(f"Network {self.params['network']} not supported")
-
-        layers = network_configs[self.params["network"]]["layers"]
-
-        if method == "adaptive_block_discriminative":
+        # Map block selectors and genes to layer-specific learning rates
+        # Note: Some blocks contain multiple layers (e.g., conv1+bn1)
+        if self.params["network"] == "resnet50":
+            # ResNet50: 6 blocks -> 7 layer names (conv1+bn1 share block 0)
             return {
-                layer: float(selector) for layer, selector in zip(layers, set_selector)
+                "conv1": set_selector[0] * np.power(10, 2 * (genes[0] - 0.5)),
+                "bn1": set_selector[0] * np.power(10, 2 * (genes[0] - 0.5)),
+                "layer1": set_selector[1] * np.power(10, 2 * (genes[1] - 0.5)),
+                "layer2": set_selector[2] * np.power(10, 2 * (genes[2] - 0.5)),
+                "layer3": set_selector[3] * np.power(10, 2 * (genes[3] - 0.5)),
+                "layer4": set_selector[4] * np.power(10, 2 * (genes[4] - 0.5)),
+                "fc": set_selector[5] * np.power(10, 2 * (genes[5] - 0.5)),
             }
-
-        elif method == "adaptive_block_scaled":
-            max_gene = np.max(genes[:-1])
+        elif self.params["network"] == "densenet121":
+            # DenseNet121: 9 blocks -> 11 layer names (conv0+norm0, denseblock4+norm5 share blocks)
             return {
-                layer: selector * gene / max_gene
-                for layer, selector, gene in zip(layers, set_selector, genes[:-1])
+                "features.conv0": set_selector[0] * np.power(10, 2 * (genes[0] - 0.5)),
+                "features.norm0": set_selector[0] * np.power(10, 2 * (genes[0] - 0.5)),
+                "features.denseblock1": set_selector[1] * np.power(10, 2 * (genes[1] - 0.5)),
+                "features.transition1": set_selector[2] * np.power(10, 2 * (genes[2] - 0.5)),
+                "features.denseblock2": set_selector[3] * np.power(10, 2 * (genes[3] - 0.5)),
+                "features.transition2": set_selector[4] * np.power(10, 2 * (genes[4] - 0.5)),
+                "features.denseblock3": set_selector[5] * np.power(10, 2 * (genes[5] - 0.5)),
+                "features.transition3": set_selector[6] * np.power(10, 2 * (genes[6] - 0.5)),
+                "features.denseblock4": set_selector[7] * np.power(10, 2 * (genes[7] - 0.5)),
+                "features.norm5": set_selector[7] * np.power(10, 2 * (genes[7] - 0.5)),
+                "classifier": set_selector[8] * np.power(10, 2 * (genes[8] - 0.5)),
             }
-
-        elif method == "adaptive_block_normalized":
-            max_gene = np.max(genes[:-1])
-            ref_gene = genes[-1]
-            return {
-                layer: selector * (gene - ref_gene) / (max_gene - ref_gene)
-                for layer, selector, gene in zip(layers, set_selector, genes[:-1])
-            }
-
-        elif method in ["adaptive_block_exponential", "adaptive_block_rgn"]:
-            return {
-                layer: selector * np.power(10, 2 * (gene - 0.5))
-                for layer, selector, gene in zip(layers, set_selector, genes[:-1])
-            }
-
         else:
-            raise ValueError(f"Method {method} not supported")
+            raise ValueError(
+                f"Network {self.params['network']} not supported. "
+                "Use 'resnet50' or 'densenet121'"
+            )
 
     def _log_results(
         self,

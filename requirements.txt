@@ -1,0 +1,16 @@
+# BioTune Core Algorithm Requirements
+# Minimal dependencies for evolutionary neural network fine-tuning
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Numerical Computing
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Metrics
+torchmetrics>=1.0.0
+
+# Optional: For progress bars and utilities
+# tqdm>=4.65.0

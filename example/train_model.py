@@ -1,10 +1,23 @@
-"""Main script for running neural network fine-tuning experiments."""
+"""Main script for running BioTune evolutionary fine-tuning experiments.
+
+This script demonstrates the core BioTune algorithm:
+- Evolutionary optimization to select which network blocks to fine-tune
+- Adaptive learning rates per block using exponential normalization
+- Comparison against simple baselines (use baseline_comparison.py)
+
+For a simpler comparison with baselines, see: baseline_comparison.py
+"""
 
 import argparse
 import datetime
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import numpy as np
 import torch
@@ -64,17 +77,16 @@ def get_experiment_config() -> Dict:
     """
     return {
         "methods": [
-            "adaptive_block_exponential",
+            "adaptive_block_normexp",  # BioTune core method: exponential LR normalization
         ],
         "networks": [
-            "resnet50",
+            "resnet50",  # Also supports: "densenet121"
         ],
         "learning_rates": [0.001],
-        "train_split_percentages": [0.5],
+        "train_split_percentages": [0.5],  # Use 50% of training data
         "population_sizes": [(10, 3)],  # (population_size, elite_size)
-        "n_generations": 10,
-        "seeds": [684, 559, 629],
-        # "seeds": [684, 559],
+        "n_generations": 10,  # Number of evolutionary generations
+        "seeds": [684, 559, 629],  # Seeds for training runs
     }
 
 
@@ -125,16 +137,17 @@ def create_fitness_params(
     Returns:
         Dictionary of fitness parameters
     """
-    # Define set size based on network architecture
+    # Define set size (number of blocks) based on network architecture
+    # BioTune core supports ResNet50 and DenseNet121
     network_set_sizes = {
-        "resnet50": 6,
-        "densenet121": 9,
-        "vgg19": 6,
-        "inception_v3": 14,
+        "resnet50": 6,      # 6 blocks: conv1/bn1, layer1-4, fc
+        "densenet121": 9,   # 9 blocks: conv0/norm0, 4 denseblocks, 3 transitions, classifier
     }
 
     if network not in network_set_sizes:
-        raise ValueError(f"Unsupported network: {network}")
+        raise ValueError(
+            f"Unsupported network: {network}. Use 'resnet50' or 'densenet121'"
+        )
 
     return {
         "method": method,
